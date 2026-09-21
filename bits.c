@@ -19,7 +19,9 @@
  * Difficulty: 1
  */
 int bitAnd(int x, int y) {
-    return 2;
+    x = ~x;
+    y = ~y;
+    return ~(x | y);
 }
 
 /*
@@ -30,7 +32,9 @@ int bitAnd(int x, int y) {
  *   Difficulty: 1
  */
 int bitXor(int x, int y) {
-    return 2;
+    int a = ~(~x & ~y);
+    int b = ~(x & y);
+    return a & b;
 }
 
 /*
@@ -50,7 +54,9 @@ int bitXor(int x, int y) {
  *   1 if x and y have the same sign , 0 otherwise.
  */
 int samesign(int x, int y) {
-    return 2;
+    if (!(x && y))          /* 至少有一个是 0 */
+        return !x & !y;     /* 两个都是 0 才为 1 */
+    return !((x >> 31) ^ (y >> 31));
 }
 
 /*
@@ -63,7 +69,22 @@ int samesign(int x, int y) {
  *   Difficulty: 4
  */
 int logtwo(int v) {
-    return 2;
+    int r = 0;
+    int b;
+    b = (v > 0xFFFF) << 4;
+    v = v >> b;
+    r = r | b;
+    b = (v > 0xFF) << 3;
+    v = v >> b;
+    r = r | b;
+    b = (v > 0xF) << 2;
+    v = v >> b;
+    r = r | b;
+    b = (v > 0x3) << 1;
+    v = v >> b;
+    r = r | b;
+    r = r | (v > 1);
+    return r;
 }
 
 /*
@@ -76,7 +97,14 @@ int logtwo(int v) {
  *    Difficulty: 2
  */
 int byteSwap(int x, int n, int m) {
-    return 2;
+    int nb = n << 3;
+    int mb = m << 3;
+    int bn = (x >> nb) & 0xFF;
+    int bm = (x >> mb) & 0xFF;
+    int mask = (0xFF << nb) | (0xFF << mb);
+    x = x & ~mask;
+    x = x | (bm << nb) | (bn << mb);
+    return x;
 }
 
 /*
@@ -88,7 +116,14 @@ int byteSwap(int x, int n, int m) {
  *   Difficulty: 3
  */
 unsigned reverse(unsigned v) {
-    return 2;
+    unsigned r = 0;
+    int i = 32;
+    for (; i; i = i - 1) {
+        r = r << 1;
+        r = r | (v & 1);
+        v = v >> 1;
+    }
+    return r;
 }
 
 /*
@@ -100,7 +135,7 @@ unsigned reverse(unsigned v) {
  *   Difficulty: 3
  */
 int logicalShift(int x, int n) {
-    return 2;
+    return (x >> n) & ~((~0x7FFFFFFF >> n) << 1);
 }
 
 /*
@@ -112,7 +147,26 @@ int logicalShift(int x, int n) {
  *   Difficulty: 4
  */
 int leftBitCount(int x) {
-    return 2;
+    int y = ~x;                 /* 数 y 的前导零 = 数 x 的左侧连续 1 */
+    int c = 0;
+    int t;
+    t = !(y >> 16);
+    c = c + (t << 4);
+    y = y << (t << 4);
+    t = !(y >> 24);
+    c = c + (t << 3);
+    y = y << (t << 3);
+    t = !(y >> 28);
+    c = c + (t << 2);
+    y = y << (t << 2);
+    t = !(y >> 30);
+    c = c + (t << 1);
+    y = y << (t << 1);
+    t = !(y >> 31);
+    c = c + t;
+    y = y << t;
+    c = c + !y;                 /* y 全零时补上最后一位 */
+    return c;
 }
 
 /*
@@ -124,7 +178,40 @@ int leftBitCount(int x) {
  *   Difficulty: 4
  */
 unsigned float_i2f(int x) {
-    return 2;
+    unsigned sign = 0;
+    unsigned a;
+    unsigned frac;
+    unsigned rnd;
+    int e = 0;
+
+    if (x == 0) return 0;
+    if (x < 0) {
+        sign = 0x80000000;
+        a = -x;
+    } else {
+        a = x;
+    }
+
+    while (!(a & 0x80000000)) {     /* 归一化：把最高位 1 移到 bit31 */
+        a = a << 1;
+        e = e + 1;
+    }
+
+    frac = (a >> 8) & 0x7FFFFF;     /* 隐含位之后的 23 位尾数 */
+    rnd = a & 0xFF;                 /* 被舍掉的 8 位 */
+
+    if (rnd > 0x80) {
+        frac = frac + 1;            /* 超过一半，进位 */
+    } else if (rnd == 0x80) {
+        if (frac & 1) frac = frac + 1;  /* 正好一半：向偶数舍入 */
+    }
+
+    if (frac == 0x800000) {         /* 进位溢出到隐含位 */
+        frac = 0;
+        e = e - 1;
+    }
+
+    return sign | ((158 - e) << 23) | frac;
 }
 
 /*
@@ -139,7 +226,13 @@ unsigned float_i2f(int x) {
  *   Difficulty: 4
  */
 unsigned floatScale2(unsigned uf) {
-    return 2;
+    unsigned exp = (uf >> 23) & 0xFF;
+    unsigned sign = uf & 0x80000000;
+
+    if (exp == 0xFF) return uf;             /* Inf / NaN 原样返回 */
+    if (exp == 0) return sign | (uf << 1);  /* 非规格化：尾数左移一位 */
+    if (exp == 0xFE) return sign | 0x7F800000;   /* 指数溢出成 Inf */
+    return uf + 0x800000;                   /* 指数加 1 */
 }
 
 /*
@@ -156,7 +249,22 @@ unsigned floatScale2(unsigned uf) {
  *   Difficulty: 3
  */
 int float64_f2i(unsigned uf1, unsigned uf2) {
-    return 2;
+    unsigned sign = uf2 >> 31;
+    unsigned exp = (uf2 >> 20) & 0x7FF;
+    int e = exp - 1023;
+    unsigned h;
+    int r;
+
+    if (exp >= 0x7FF) return 0x80000000;    /* Inf / NaN */
+    if (!exp) return 0;                     /* 零 / 非规格化：过小 */
+    if (e < 0) return 0;                    /* |值| < 1 */
+    if (e > 30) return 0x80000000;          /* 超出 int 范围 */
+
+    /* h = 完整 53 位尾数(隐含 1 打头)的高 32 位，即 m >> 21 */
+    h = 0x80000000 | ((uf2 & 0xFFFFF) << 11) | (uf1 >> 21);
+    r = h >> (31 - e);                      /* 截断取整数部分（向零取整） */
+    if (sign) r = -r;
+    return r;
 }
 
 /*
@@ -173,5 +281,8 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
  *   Difficulty: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+    if (x > 127) return 0x7F800000;         /* 太大：+Inf */
+    if (x >= -126) return (x + 127) << 23;  /* 规格化数 */
+    if (x >= -149) return 1 << (x + 149);   /* 非规格化数 */
+    return 0;                               /* 太小：0 */
 }
